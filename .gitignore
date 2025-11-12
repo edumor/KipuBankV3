@@ -1,0 +1,14 @@
+# Ignore everything by default
+*
+
+# But don't ignore these files and directories
+!.gitignore
+!KipuBankV3.sol
+!src/
+!src/**
+
+# Ignore common files
+.DS_Store
+*.log
+node_modules/
+.env
