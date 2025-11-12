@@ -55,7 +55,7 @@ contract KipuBankV3 is Ownable {
 
 ### Key Integrations
 
-1. **Uniswap V2 Router**: `0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D`
+1. **Uniswap V2 Router**: `0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008`
 2. **Chainlink ETH/USD**: `0x694AA1769357215DE4FAC081bf1f309aDC325306`
 3. **Chainlink USDC/USD**: `0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E`
 4. **USDC Token (Sepolia)**: `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
@@ -234,12 +234,27 @@ unpause()
 ### Constructor Parameters (Sepolia)
 ```solidity
 constructor(
-    address initialOwner,     // Your wallet address
-    address ethPriceFeed,     // 0x694AA1769357215DE4FAC081bf1f309aDC325306
-    address usdcAddress,      // 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238  
-    address usdcPriceFeed,    // 0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E
-    address uniswapRouter     // 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+    address initialOwner,     // 0x4829f4f3aadee47cb1cc795b2ec78a166042e918 (Your wallet)
+    address ethPriceFeed,     // 0x694AA1769357215DE4FAC081bf1f309aDC325306 (Chainlink ETH/USD)
+    address usdcAddress,      // 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238 (USDC Sepolia)
+    address usdcPriceFeed,    // 0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E (Chainlink USDC/USD)
+    address uniswapRouter     // 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008 (SushiSwap Router)
 )
+```
+
+### ABI-Encoded Constructor Arguments
+For Etherscan verification, the ABI-encoded arguments used for deployment:
+```
+0000000000000000000000004829f4f3aadee47cb1cc795b2ec78a166042e918000000000000000000000000694aa1769357215de4fac081bf1f309adc3253060000000000000000000000001c7d4b196cb0c7b01d743fbc6116a902379c7238000000000000000000000000a2f78ab2355fe2f984d808b5cee7fd0a93d5270e000000000000000000000000c532a74256d3db42d0bf7a0400fefdbad7694008
+```
+
+### Actual Deployment Parameters Used
+```
+Parameter 1 (initialOwner): 0x4829f4f3aadee47cb1cc795b2ec78a166042e918
+Parameter 2 (ethPriceFeed): 0x694AA1769357215DE4FAC081bf1f309aDC325306  
+Parameter 3 (usdcAddress): 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
+Parameter 4 (usdcPriceFeed): 0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E
+Parameter 5 (uniswapRouter): 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008 (SushiSwap)
 ```
 
 ### Deployment Steps
@@ -248,6 +263,11 @@ constructor(
 3. Deploy with constructor parameters
 4. Verify on Etherscan
 5. Initialize token support with `initializeTokens()`
+
+### ✅ Successful Deployment Verification
+**Deployed Contract**: Successfully deployed to Sepolia at `0xFE5368128fa55C0B1d68C4271337B2a997d70b47`  
+**Router Used**: SushiSwap Router (`0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008`) - Alternative to Uniswap V2  
+**Verification**: Contract verified on Sepolia Etherscan with matching bytecode and ABI
 
 ## 🚀 Improvements Over KipuBankV2
 
