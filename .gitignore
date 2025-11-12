@@ -3,6 +3,7 @@
 
 # But don't ignore these files and directories
 !.gitignore
+!README.md
 !KipuBankV3.sol
 !src/
 !src/**
