@@ -150,113 +150,113 @@ function getSwapPreview(address tokenIn, address tokenOut) external view returns
 **Sepolia Testnet**: `0xF8eD172b29c2CF2037b2d6A5C611C1cD26AbbA9e`  
 **Etherscan**: https://sepolia.etherscan.io/address/0xF8eD172b29c2CF2037b2d6A5C611C1cD26AbbA9e
 
-## 🔧 Correcciones Realizadas sobre Observaciones del Instructor
+## 🔧 Contract Corrections Based on Instructor Feedback
 
-### Observaciones Originales del Instructor:
-1. **currentCapUSDC se descuenta en los retiros pero no se vuelve a actualizar** - Podía quedar en 0 y no reflejar la capacidad real del banco
-2. **Conversión incorrecta en retiros** - `uint256 ethEquivalent = _convertToUSDC(address(0), usdcAmount)` no debería convertir a USDC, sino a ETH
-3. **Inconsistencia de decimales en MAX_CAP** - MAX_CAP estaba en wei (18 decimales), pero USDC usa 6 decimales
-4. **Lógica inconsistente en balance ETH** - `currentETHBalance = cachedETHBalance + msg.value` suma ETH real, pero en algunos lugares se sumaba +1 incorrectamente
+### Original Instructor Observations:
+1. **currentCapUSDC is deducted on withdrawals but never updated** - Could remain at 0 and not reflect the bank's actual capacity
+2. **Incorrect conversion in withdrawals** - `uint256 ethEquivalent = _convertToUSDC(address(0), usdcAmount)` should not convert to USDC, but to ETH
+3. **Decimal inconsistency in MAX_CAP** - MAX_CAP was in wei (18 decimals), but productive USDC has 6 decimals
+4. **Inconsistent ETH balance logic** - `currentETHBalance = cachedETHBalance + msg.value` adds real ETH, but in some places it incorrectly added +1
 
-### Correcciones Implementadas:
+### Implemented Corrections:
 
-#### 1. **Actualización correcta de `currentCapUSDC` en retiros**
-**Ubicación**: Función `withdrawETH()` (líneas ~494-498) y `withdrawUSDC()` (líneas ~518-522)  
-**Problema Original**: La variable `currentCapUSDC` solo se incrementaba en depósitos pero no se decrementaba en retiros, causando que el límite del banco quedara permanentemente ocupado.
+#### 1. **Proper `currentCapUSDC` Update on Withdrawals**
+**Location**: Functions `withdrawETH()` (lines ~494-498) and `withdrawUSDC()` (lines ~518-522)  
+**Original Problem**: The `currentCapUSDC` variable was only incremented on deposits but never decremented on withdrawals, causing the bank's capacity limit to remain permanently occupied.
 
-**Solución Implementada**:
+**Implemented Solution**:
 ```solidity
-// En withdrawETH()
+// In withdrawETH()
 uint256 newCapUSDC = cachedCapUSDC - usdcAmount;
 currentCapUSDC = newCapUSDC;
 
-// En withdrawUSDC()
+// In withdrawUSDC()
 uint256 newCapUSDC = cachedCapUSDC - usdcAmount;
 currentCapUSDC = newCapUSDC;
 ```
 
-**Justificación**: Ahora `currentCapUSDC` se actualiza bidireccionalmente: aumenta en depósitos y disminuye en retiros, reflejando correctamente la capacidad disponible del banco en todo momento.
+**Rationale**: Now `currentCapUSDC` updates bidirectionally: increases on deposits and decreases on withdrawals, correctly reflecting the bank's available capacity at all times.
 
 ---
 
-#### 2. **Corrección de conversión en retiros ETH**
-**Ubicación**: Función `withdrawETH()` (línea ~485)  
-**Problema Original**: Se usaba `_convertToUSDC()` cuando debía convertirse de USDC a ETH para el retiro.
+#### 2. **Fixed Conversion Direction in ETH Withdrawals**
+**Location**: Function `withdrawETH()` (line ~485)  
+**Original Problem**: Used `_convertToUSDC()` when it should convert from USDC to ETH for withdrawals.
 
-**Solución Implementada**:
+**Implemented Solution**:
 ```solidity
-// ANTES (INCORRECTO):
+// BEFORE (INCORRECT):
 uint256 ethEquivalent = _convertToUSDC(address(0), usdcAmount);
 
-// AHORA (CORRECTO):
+// NOW (CORRECT):
 uint256 ethEquivalent = _convertFromUSDC(address(0), usdcAmount);
 ```
 
-**Justificación**: La función `_convertFromUSDC()` realiza la conversión inversa correcta: toma una cantidad en USDC y retorna su equivalente en ETH usando los oráculos de Chainlink, permitiendo que el usuario retire la cantidad correcta de ETH según su balance en USDC.
+**Rationale**: The `_convertFromUSDC()` function performs the correct inverse conversion: takes a USDC amount and returns its ETH equivalent using Chainlink oracles, allowing users to withdraw the correct amount of ETH based on their USDC balance.
 
 ---
 
-#### 3. **Corrección de decimales en MAX_CAP**
-**Ubicación**: Constante `MAX_CAP` (línea ~249)  
-**Problema Original**: `MAX_CAP` estaba definido en wei (18 decimales) pero USDC usa 6 decimales, causando inconsistencia en las comparaciones.
+#### 3. **Fixed Decimal Places in MAX_CAP**
+**Location**: Constant `MAX_CAP` (line ~249)  
+**Original Problem**: `MAX_CAP` was defined in wei (18 decimals) but USDC uses 6 decimals, causing inconsistency in comparisons.
 
-**Solución Implementada**:
+**Implemented Solution**:
 ```solidity
-// ANTES (INCORRECTO):
-uint256 private constant MAX_CAP = 100 ether; // 18 decimales
+// BEFORE (INCORRECT):
+uint256 private constant MAX_CAP = 100 ether; // 18 decimals
 
-// AHORA (CORRECTO):
-uint256 private constant MAX_CAP = 100000000000; // 100,000 USDC con 6 decimales
+// NOW (CORRECT):
+uint256 private constant MAX_CAP = 100000000000; // 100,000 USDC with 6 decimals
 ```
 
-**Justificación**: Como todas las capacidades y balances se manejan internamente en USDC (6 decimales), `MAX_CAP` debe estar en el mismo formato. El valor representa 100,000 USDC, equivalente al límite original de ~100 ETH según precios actuales.
+**Rationale**: Since all capacities and balances are handled internally in USDC (6 decimals), `MAX_CAP` must use the same format. The value represents 100,000 USDC, equivalent to the original limit of ~100 ETH at current prices.
 
 ---
 
-#### 4. **Eliminación de incrementos incorrectos (+1) en balances ETH**
-**Ubicación**: Múltiples funciones de depósito y retiro  
-**Problema Original**: En algunas líneas se sumaba `cachedETHBalance + 1` sin justificación lógica, alterando incorrectamente el balance real de ETH.
+#### 4. **Removed Incorrect ETH Balance Increments (+1)**
+**Location**: Multiple deposit and withdrawal functions  
+**Original Problem**: In some lines, `cachedETHBalance + 1` was added without logical justification, incorrectly altering the actual ETH balance.
 
-**Solución Implementada**:
+**Implemented Solution**:
 ```solidity
-// ANTES (INCORRECTO):
+// BEFORE (INCORRECT):
 currentETHBalance = cachedETHBalance + 1;
 
-// AHORA (CORRECTO):
-currentETHBalance = cachedETHBalance + msg.value;  // En depósitos
-currentETHBalance = cachedETHBalance - ethEquivalent;  // En retiros
+// NOW (CORRECT):
+currentETHBalance = cachedETHBalance + msg.value;  // On deposits
+currentETHBalance = cachedETHBalance - ethEquivalent;  // On withdrawals
 ```
 
-**Justificación**: Los balances deben reflejar exactamente las cantidades reales transferidas. En depósitos se suma `msg.value` (ETH recibido), en retiros se resta `ethEquivalent` (ETH enviado). Cualquier ajuste arbitrario (+1) causaría discrepancias entre el balance contable y el balance real del contrato.
+**Rationale**: Balances must reflect exactly the actual transferred amounts. On deposits, `msg.value` (received ETH) is added; on withdrawals, `ethEquivalent` (sent ETH) is subtracted. Any arbitrary adjustment (+1) would cause discrepancies between accounting balance and the contract's actual balance.
 
 ---
 
-#### 5. **Inicialización correcta de variables de estado**
-**Ubicación**: Constructor (líneas ~368-370)  
-**Mejora Adicional**: Se aseguró que todas las variables de estado se inicialicen explícitamente en 0.
+#### 5. **Explicit State Variable Initialization**
+**Location**: Constructor (lines ~368-370)  
+**Additional Improvement**: Ensured all state variables are explicitly initialized to 0.
 
-**Implementación**:
+**Implementation**:
 ```solidity
 currentUSDCBalance = 0;
 currentETHBalance = 0; 
 currentCapUSDC = 0;
 ```
 
-**Justificación**: Aunque Solidity inicializa variables en 0 por defecto, la inicialización explícita mejora la claridad del código y garantiza un estado inicial consistente y predecible.
+**Rationale**: Although Solidity initializes variables to 0 by default, explicit initialization improves code clarity and guarantees a consistent and predictable initial state.
 
 ---
 
-### Impacto de las Correcciones:
+### Impact of Corrections:
 
-✅ **Gestión correcta de capacidad**: El banco ahora libera capacidad al hacer retiros, permitiendo nuevos depósitos sin bloquear el límite permanentemente.
+✅ **Proper capacity management**: The bank now releases capacity on withdrawals, allowing new deposits without permanently blocking the limit.
 
-✅ **Conversiones precisas**: Los usuarios retiran la cantidad correcta de ETH según su balance en USDC.
+✅ **Precise conversions**: Users withdraw the correct amount of ETH based on their USDC balance.
 
-✅ **Consistencia decimal**: Todas las operaciones de capacidad usan la misma base (6 decimales USDC).
+✅ **Decimal consistency**: All capacity operations use the same base (6 decimals USDC).
 
-✅ **Contabilidad exacta**: Los balances de ETH reflejan exactamente las transferencias reales sin ajustes arbitrarios.
+✅ **Exact accounting**: ETH balances reflect exactly the real transfers without arbitrary adjustments.
 
-✅ **Confiabilidad mejorada**: El contrato ahora maneja correctamente el ciclo completo de depósitos y retiros sin discrepancias contables.
+✅ **Improved reliability**: The contract now correctly handles the complete deposit and withdrawal cycle without accounting discrepancies.
 
 ## 👨‍🏫 Comprehensive Development Guide for Instructors
 
