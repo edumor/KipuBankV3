@@ -10,7 +10,7 @@
 
 **Author**: Eduardo Moreno  
 **Academic Work**: Final Project Module 4 - 2025-S2-EDP-HENRY-M4  
-**Contract Address (Sepolia)**: `0xFE5368128fa55C0B1d68C4271337B2a997d70b47`
+**Contract Address (Sepolia)**: `0xF8eD172b29c2CF2037b2d6A5C611C1cD26AbbA9e`
 
 ## 🎯 Key Features
 
@@ -147,8 +147,116 @@ function getSwapPreview(address tokenIn, address tokenOut) external view returns
 ## 🧪 Testing Guide for Instructors
 
 ### Contract Address
-**Sepolia Testnet**: `0xFE5368128fa55C0B1d68C4271337B2a997d70b47`  
-**Etherscan**: https://sepolia.etherscan.io/address/0xFE5368128fa55C0B1d68C4271337B2a997d70b47
+**Sepolia Testnet**: `0xF8eD172b29c2CF2037b2d6A5C611C1cD26AbbA9e`  
+**Etherscan**: https://sepolia.etherscan.io/address/0xF8eD172b29c2CF2037b2d6A5C611C1cD26AbbA9e
+
+## 🔧 Correcciones Realizadas sobre Observaciones del Instructor
+
+### Observaciones Originales del Instructor:
+1. **currentCapUSDC se descuenta en los retiros pero no se vuelve a actualizar** - Podía quedar en 0 y no reflejar la capacidad real del banco
+2. **Conversión incorrecta en retiros** - `uint256 ethEquivalent = _convertToUSDC(address(0), usdcAmount)` no debería convertir a USDC, sino a ETH
+3. **Inconsistencia de decimales en MAX_CAP** - MAX_CAP estaba en wei (18 decimales), pero USDC usa 6 decimales
+4. **Lógica inconsistente en balance ETH** - `currentETHBalance = cachedETHBalance + msg.value` suma ETH real, pero en algunos lugares se sumaba +1 incorrectamente
+
+### Correcciones Implementadas:
+
+#### 1. **Actualización correcta de `currentCapUSDC` en retiros**
+**Ubicación**: Función `withdrawETH()` (líneas ~494-498) y `withdrawUSDC()` (líneas ~518-522)  
+**Problema Original**: La variable `currentCapUSDC` solo se incrementaba en depósitos pero no se decrementaba en retiros, causando que el límite del banco quedara permanentemente ocupado.
+
+**Solución Implementada**:
+```solidity
+// En withdrawETH()
+uint256 newCapUSDC = cachedCapUSDC - usdcAmount;
+currentCapUSDC = newCapUSDC;
+
+// En withdrawUSDC()
+uint256 newCapUSDC = cachedCapUSDC - usdcAmount;
+currentCapUSDC = newCapUSDC;
+```
+
+**Justificación**: Ahora `currentCapUSDC` se actualiza bidireccionalmente: aumenta en depósitos y disminuye en retiros, reflejando correctamente la capacidad disponible del banco en todo momento.
+
+---
+
+#### 2. **Corrección de conversión en retiros ETH**
+**Ubicación**: Función `withdrawETH()` (línea ~485)  
+**Problema Original**: Se usaba `_convertToUSDC()` cuando debía convertirse de USDC a ETH para el retiro.
+
+**Solución Implementada**:
+```solidity
+// ANTES (INCORRECTO):
+uint256 ethEquivalent = _convertToUSDC(address(0), usdcAmount);
+
+// AHORA (CORRECTO):
+uint256 ethEquivalent = _convertFromUSDC(address(0), usdcAmount);
+```
+
+**Justificación**: La función `_convertFromUSDC()` realiza la conversión inversa correcta: toma una cantidad en USDC y retorna su equivalente en ETH usando los oráculos de Chainlink, permitiendo que el usuario retire la cantidad correcta de ETH según su balance en USDC.
+
+---
+
+#### 3. **Corrección de decimales en MAX_CAP**
+**Ubicación**: Constante `MAX_CAP` (línea ~249)  
+**Problema Original**: `MAX_CAP` estaba definido en wei (18 decimales) pero USDC usa 6 decimales, causando inconsistencia en las comparaciones.
+
+**Solución Implementada**:
+```solidity
+// ANTES (INCORRECTO):
+uint256 private constant MAX_CAP = 100 ether; // 18 decimales
+
+// AHORA (CORRECTO):
+uint256 private constant MAX_CAP = 100000000000; // 100,000 USDC con 6 decimales
+```
+
+**Justificación**: Como todas las capacidades y balances se manejan internamente en USDC (6 decimales), `MAX_CAP` debe estar en el mismo formato. El valor representa 100,000 USDC, equivalente al límite original de ~100 ETH según precios actuales.
+
+---
+
+#### 4. **Eliminación de incrementos incorrectos (+1) en balances ETH**
+**Ubicación**: Múltiples funciones de depósito y retiro  
+**Problema Original**: En algunas líneas se sumaba `cachedETHBalance + 1` sin justificación lógica, alterando incorrectamente el balance real de ETH.
+
+**Solución Implementada**:
+```solidity
+// ANTES (INCORRECTO):
+currentETHBalance = cachedETHBalance + 1;
+
+// AHORA (CORRECTO):
+currentETHBalance = cachedETHBalance + msg.value;  // En depósitos
+currentETHBalance = cachedETHBalance - ethEquivalent;  // En retiros
+```
+
+**Justificación**: Los balances deben reflejar exactamente las cantidades reales transferidas. En depósitos se suma `msg.value` (ETH recibido), en retiros se resta `ethEquivalent` (ETH enviado). Cualquier ajuste arbitrario (+1) causaría discrepancias entre el balance contable y el balance real del contrato.
+
+---
+
+#### 5. **Inicialización correcta de variables de estado**
+**Ubicación**: Constructor (líneas ~368-370)  
+**Mejora Adicional**: Se aseguró que todas las variables de estado se inicialicen explícitamente en 0.
+
+**Implementación**:
+```solidity
+currentUSDCBalance = 0;
+currentETHBalance = 0; 
+currentCapUSDC = 0;
+```
+
+**Justificación**: Aunque Solidity inicializa variables en 0 por defecto, la inicialización explícita mejora la claridad del código y garantiza un estado inicial consistente y predecible.
+
+---
+
+### Impacto de las Correcciones:
+
+✅ **Gestión correcta de capacidad**: El banco ahora libera capacidad al hacer retiros, permitiendo nuevos depósitos sin bloquear el límite permanentemente.
+
+✅ **Conversiones precisas**: Los usuarios retiran la cantidad correcta de ETH según su balance en USDC.
+
+✅ **Consistencia decimal**: Todas las operaciones de capacidad usan la misma base (6 decimales USDC).
+
+✅ **Contabilidad exacta**: Los balances de ETH reflejan exactamente las transferencias reales sin ajustes arbitrarios.
+
+✅ **Confiabilidad mejorada**: El contrato ahora maneja correctamente el ciclo completo de depósitos y retiros sin discrepancias contables.
 
 ## 👨‍🏫 Comprehensive Development Guide for Instructors
 
@@ -478,9 +586,10 @@ Parameter 5 (uniswapRouter): 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008 (SushiSw
 5. Initialize token support with `initializeTokens()`
 
 ### ✅ Successful Deployment Verification
-**Deployed Contract**: Successfully deployed to Sepolia at `0xFE5368128fa55C0B1d68C4271337B2a997d70b47`  
+**Deployed Contract**: Successfully deployed to Sepolia at `0xF8eD172b29c2CF2037b2d6A5C611C1cD26AbbA9e`  
 **Router Used**: SushiSwap Router (`0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008`) - Alternative to Uniswap V2  
-**Verification**: Contract verified on Sepolia Etherscan with matching bytecode and ABI
+**Verification**: Contract verified on Sepolia Etherscan with matching bytecode and ABI  
+**Etherscan Verification**: Successfully generated matching Bytecode and ABI
 
 ## 🚀 Improvements Over KipuBankV2
 
