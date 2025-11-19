@@ -208,7 +208,7 @@ contract KipuBankV3 is Ownable {
     //////////////////////////////////////////////////////////////*/
     
     /// @notice Maximum bank capacity - 100,000 USDC (6 decimals)
-    uint256 private constant MAX_CAP = 100000000000; // 100,000 USDC with 6 decimals
+    uint256 private constant MAX_CAP = 100_000 * 1e6; // 100,000 USDC with 6 decimals
     
     /// @notice Wei to Gwei conversion factor
     uint256 private constant WEI_TO_GWEI = 1000000000;
@@ -549,7 +549,7 @@ contract KipuBankV3 is Ownable {
         // Validate balance
         if (usdcAmount > userBalance) revert InsufficientBal();
 
-        // Convert USDC amount to ETH equivalent
+        // ✅ CORREGIDO: Convertir USDC a ETH equivalente (era _convertToUSDC)
         uint256 ethEquivalent = _convertFromUSDC(address(0), usdcAmount);
         
         // Validate ETH availability
