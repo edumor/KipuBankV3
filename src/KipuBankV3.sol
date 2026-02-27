@@ -210,8 +210,8 @@ contract KipuBankV3 is Ownable {
     /// @notice Maximum bank capacity - 100,000 USDC (6 decimals)
     uint256 private constant MAX_CAP = 100_000 * 1e6; // 100,000 USDC with 6 decimals
     
-    /// @notice Wei to Gwei conversion factor
-    uint256 private constant WEI_TO_GWEI = 1000000000;
+    /// @notice Wei to Gwei conversion factor (exposed via getContractState for UI/frontend use)
+    uint256 private constant WEI_TO_GWEI = 1e9;
     
     /// @notice ETH price feed address (immutable)
     address public immutable ethPriceFeed;
@@ -342,11 +342,7 @@ contract KipuBankV3 is Ownable {
         usdcPriceFeed = _usdcPriceFeed;
         uniswapRouter = _uniswapRouter;
         uniswapFactory = IUniswapV2Router02(_uniswapRouter).factory();
-
-        // Initialize state variables to 0
-        currentUSDCBalance = 0;
-        currentETHBalance = 0; 
-        currentCapUSDC = 0;
+        // State variables default to 0 (Solidity default)
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -441,35 +437,7 @@ contract KipuBankV3 is Ownable {
      * @dev Converts ETH to USDC equivalent using Chainlink oracle and respects bank cap
      */
     function depositETH() external payable {
-        if (isPaused) revert Paused();
-        if (msg.value == 0) revert ZeroAmount();
-
-        // Cache state variables (single SLOAD pattern)
-        uint256 cachedUSDCBalance = currentUSDCBalance;
-        uint256 cachedETHBalance = currentETHBalance;
-        uint256 cachedCapUSDC = currentCapUSDC;
-        address userAddr = msg.sender;
-        uint256 userBalance = userDepositUSDC[userAddr];
-
-        // Convert ETH to USDC equivalent
-        uint256 usdcEquivalent = _convertToUSDC(address(0), msg.value);
-        
-        // Check bank capacity constraint
-        uint256 newCapUSDC = cachedCapUSDC + usdcEquivalent;
-        if (newCapUSDC > MAX_CAP) revert CapExceeded();
-
-        // Calculate new balances
-        uint256 newUserBalance = userBalance + usdcEquivalent;
-        uint256 newTotalUSDC = cachedUSDCBalance + usdcEquivalent;
-        uint256 newETHBalance = cachedETHBalance + msg.value;
-
-        // Update state (single SSTORE pattern)
-        userDepositUSDC[userAddr] = newUserBalance;
-        currentUSDCBalance = newTotalUSDC;
-        currentETHBalance = newETHBalance;
-        currentCapUSDC = newCapUSDC;
-
-        emit Deposit(userAddr, usdcEquivalent, msg.value, block.timestamp);
+        _depositETH();
     }
 
     /**
@@ -549,17 +517,23 @@ contract KipuBankV3 is Ownable {
         // Validate balance
         if (usdcAmount > userBalance) revert InsufficientBal();
 
-        // ✅ CORREGIDO: Convertir USDC a ETH equivalente (era _convertToUSDC)
+        // Convert USDC to ETH equivalent
         uint256 ethEquivalent = _convertFromUSDC(address(0), usdcAmount);
         
         // Validate ETH availability
         if (ethEquivalent > cachedETHBalance) revert InsufficientBal();
 
-        // Calculate new balances
-        uint256 newUserBalance = userBalance - usdcAmount;
-        uint256 newETHBalance = cachedETHBalance - ethEquivalent;
-        uint256 newUSDCBalance = cachedUSDCBalance - usdcAmount;
-        uint256 newCapUSDC = cachedCapUSDC - usdcAmount;
+        // Calculate new balances (unchecked: underflow impossible after validation)
+        uint256 newUserBalance;
+        uint256 newETHBalance;
+        uint256 newUSDCBalance;
+        uint256 newCapUSDC;
+        unchecked {
+            newUserBalance = userBalance - usdcAmount;
+            newETHBalance = cachedETHBalance - ethEquivalent;
+            newUSDCBalance = cachedUSDCBalance - usdcAmount;
+            newCapUSDC = cachedCapUSDC - usdcAmount;
+        }
 
         // Update state
         userDepositUSDC[userAddr] = newUserBalance;
@@ -591,10 +565,15 @@ contract KipuBankV3 is Ownable {
         // Validate balance
         if (usdcAmount > userBalance) revert InsufficientBal();
 
-        // Calculate new balances
-        uint256 newUserBalance = userBalance - usdcAmount;
-        uint256 newUSDCBalance = cachedUSDCBalance - usdcAmount;
-        uint256 newCapUSDC = cachedCapUSDC - usdcAmount;
+        // Calculate new balances (unchecked: underflow impossible after validation)
+        uint256 newUserBalance;
+        uint256 newUSDCBalance;
+        uint256 newCapUSDC;
+        unchecked {
+            newUserBalance = userBalance - usdcAmount;
+            newUSDCBalance = cachedUSDCBalance - usdcAmount;
+            newCapUSDC = cachedCapUSDC - usdcAmount;
+        }
 
         // Update state
         userDepositUSDC[userAddr] = newUserBalance;
@@ -840,31 +819,42 @@ contract KipuBankV3 is Ownable {
      * @dev Automatically converts ETH to USDC equivalent and credits user balance
      */
     receive() external payable {
+        _depositETH();
+    }
+
+    /**
+     * @notice Internal function to handle ETH deposits
+     * @dev Consolidates logic for depositETH() and receive()
+     */
+    function _depositETH() internal {
         if (isPaused) revert Paused();
         if (msg.value == 0) revert ZeroAmount();
 
-        // Cache state variables
+        // Cache state variables (single SLOAD pattern)
         uint256 cachedUSDCBalance = currentUSDCBalance;
         uint256 cachedETHBalance = currentETHBalance;
         uint256 cachedCapUSDC = currentCapUSDC;
+        address userAddr = msg.sender;
+        uint256 userBalance = userDepositUSDC[userAddr];
 
         // Convert ETH to USDC equivalent
         uint256 usdcEquivalent = _convertToUSDC(address(0), msg.value);
         
-        // Check bank capacity
+        // Check bank capacity constraint
         uint256 newCapUSDC = cachedCapUSDC + usdcEquivalent;
         if (newCapUSDC > MAX_CAP) revert CapExceeded();
 
-        // Update balances
-        uint256 newUserBalance = userDepositUSDC[msg.sender] + usdcEquivalent;
+        // Calculate new balances
+        uint256 newUserBalance = userBalance + usdcEquivalent;
         uint256 newTotalUSDC = cachedUSDCBalance + usdcEquivalent;
         uint256 newETHBalance = cachedETHBalance + msg.value;
 
-        userDepositUSDC[msg.sender] = newUserBalance;
+        // Update state (single SSTORE pattern)
+        userDepositUSDC[userAddr] = newUserBalance;
         currentUSDCBalance = newTotalUSDC;
         currentETHBalance = newETHBalance;
         currentCapUSDC = newCapUSDC;
 
-        emit Deposit(msg.sender, usdcEquivalent, msg.value, block.timestamp);
+        emit Deposit(userAddr, usdcEquivalent, msg.value, block.timestamp);
     }
 }
