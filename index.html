@@ -255,7 +255,7 @@
     <div class="stat">
       <div class="stat-label">Contract Status</div>
       <div class="stat-value" style="font-size:1rem;margin-top:0.6rem" id="statPaused">
-        <span class="pill pill-yellow"><span id="contractStatusText">⏳ Not loaded</span></span>
+        <span class="pill pill-yellow"><span id="contractStatusBadge">⏳ Not loaded</span></span>
       </div>
       <div class="stat-sub" id="statNetwork">Connect wallet to load</div>
     </div>
@@ -516,7 +516,8 @@ async function connectWallet() {
     document.getElementById('withdrawForm').style.display = 'block';
 
     document.getElementById('contractAddr').textContent = CONTRACT_ADDRESS;
-        if (statusEl) statusEl.innerHTML = '✅ Loaded';
+        const _st = document.getElementById('contractStatusBadge');
+        if (_st) { _st.textContent = '✅ Loaded'; _st.style.background = '#22c55e'; _st.style.color = '#fff'; }
     document.getElementById('statNetwork').textContent  = `Sepolia · ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
 
     await refreshStats();
@@ -530,9 +531,6 @@ async function connectWallet() {
 
 // ── REFRESH STATS ─────────────────────────────────────────
 async function refreshStats() {
-        // Update contract status
-        const statusEl = document.getElementById('contractStatusText');
-        if (statusEl) statusEl.innerHTML = '⏳ Loading...';
   if (!contract || !userAddress) return;
   try {
     const [cap, maxCap, ethBal, usdcBal, isPaused] = await Promise.all([
