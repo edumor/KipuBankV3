@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KipuBankV3 — DeFi Banking Interface</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --card: #1a1d2e;
+      --border: #2d3150;
+      --accent: #6366f1;
+      --accent2: #22d3ee;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #1a1d2e 0%, #0f1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .logo { display: flex; align-items: center; gap: 0.75rem; }
+    .logo-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+    }
+    .logo h1 { font-size: 1.3rem; font-weight: 700; }
+    .logo span { font-size: 0.8rem; color: var(--muted); }
+
+    #connectBtn {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      border: none; border-radius: 8px; color: white;
+      padding: 0.6rem 1.4rem; cursor: pointer; font-size: 0.9rem;
+      font-weight: 600; transition: opacity 0.2s;
+    }
+    #connectBtn:hover { opacity: 0.85; }
+    #connectBtn.connected {
+      background: linear-gradient(135deg, #166534, var(--green));
+    }
+
+    .wallet-info {
+      display: none; align-items: center; gap: 0.5rem;
+      font-size: 0.85rem; color: var(--muted);
+    }
+    .wallet-info.show { display: flex; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+
+    /* ── MAIN ── */
+    main {
+      max-width: 1100px; margin: 0 auto;
+      padding: 2rem 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 768px) { main { grid-template-columns: 1fr; } }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    .icon-blue  { background: rgba(99,102,241,0.15); }
+    .icon-green { background: rgba(34,197,94,0.15); }
+    .icon-red   { background: rgba(239,68,68,0.15); }
+    .icon-cyan  { background: rgba(34,211,238,0.15); }
+
+    .card-header h2 { font-size: 1rem; font-weight: 700; }
+    .card-header p  { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+
+    /* ── STATS ── */
+    .stats-grid {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 500px) { .stats-grid { grid-template-columns: 1fr; } }
+
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; margin: 0.4rem 0 0; }
+    .stat-sub   { font-size: 0.75rem; color: var(--muted); }
+    .text-green  { color: var(--green); }
+    .text-cyan   { color: var(--accent2); }
+    .text-accent { color: var(--accent); }
+    .text-yellow { color: var(--yellow); }
+
+    /* ── FORM ── */
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 500; }
+    input, select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.65rem 0.9rem; color: var(--text);
+      font-size: 0.9rem; transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+
+    .btn {
+      width: 100%; border: none; border-radius: 8px; padding: 0.75rem;
+      font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-blue    { background: linear-gradient(135deg, var(--accent), #8b5cf6); color: white; }
+    .btn-green   { background: linear-gradient(135deg, #166534, var(--green)); color: white; }
+    .btn-red     { background: linear-gradient(135deg, #7f1d1d, var(--red)); color: white; }
+    .btn-cyan    { background: linear-gradient(135deg, #164e63, var(--accent2)); color: white; }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .tab {
+      flex: 1; padding: 0.55rem; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 0.82rem; font-weight: 600; transition: all 0.2s;
+    }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+    /* ── LOG ── */
+    .log {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.85rem; min-height: 80px;
+      max-height: 180px; overflow-y: auto; font-size: 0.8rem;
+      font-family: 'Courier New', monospace;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .log-entry:last-child { border-bottom: none; }
+    .log-ok  { color: var(--green); }
+    .log-err { color: var(--red); }
+    .log-info{ color: var(--accent2); }
+
+    /* ── PROGRESS BAR ── */
+    .cap-bar-wrap {
+      background: var(--bg); border-radius: 100px;
+      height: 8px; overflow: hidden; margin: 0.5rem 0;
+    }
+    .cap-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 100px; transition: width 0.5s ease;
+    }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.3rem 0.7rem; border-radius: 100px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .pill-green  { background: rgba(34,197,94,0.12);  color: var(--green); }
+    .pill-red    { background: rgba(239,68,68,0.12);   color: var(--red); }
+    .pill-yellow { background: rgba(234,179,8,0.12);   color: var(--yellow); }
+
+    .not-connected-msg {
+      text-align: center; color: var(--muted);
+      padding: 2rem 1rem; font-size: 0.9rem;
+    }
+    .not-connected-msg span { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+
+    /* ── FULL WIDTH ── */
+    .full { grid-column: 1 / -1; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 2rem;
+      color: var(--muted); font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏦</div>
+    <div>
+      <h1>KipuBankV3</h1>
+      <span>DeFi Banking Protocol · Sepolia Testnet</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div class="wallet-info" id="walletInfo">
+      <div class="dot"></div>
+      <span id="walletAddr">Not connected</span>
+    </div>
+    <button id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════ MAIN -->
+<main>
+
+  <!-- ── STATS ── -->
+  <div class="stats-grid">
+    <div class="stat">
+      <div class="stat-label">Bank Capacity Used</div>
+      <div class="stat-value text-cyan" id="statCap">—</div>
+      <div class="cap-bar-wrap"><div class="cap-bar" id="capBar" style="width:0%"></div></div>
+      <div class="stat-sub" id="statCapPct">of 100,000 USDC max</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Your ETH Balance</div>
+      <div class="stat-value text-accent" id="statETH">—</div>
+      <div class="stat-sub">Deposited in bank</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Your USDC Balance</div>
+      <div class="stat-value text-green" id="statUSDC">—</div>
+      <div class="stat-sub">Deposited in bank</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Contract Status</div>
+      <div class="stat-value" style="font-size:1rem;margin-top:0.6rem" id="statPaused">
+        <span class="pill pill-yellow">⏳ Not loaded</span>
+      </div>
+      <div class="stat-sub" id="statNetwork">Connect wallet to load</div>
+    </div>
+  </div>
+
+  <!-- ── DEPOSIT ── -->
+  <div class="card" id="depositCard">
+    <div class="card-header">
+      <div class="card-icon icon-blue">⬇️</div>
+      <div>
+        <h2>Deposit</h2>
+        <p>Deposit ETH or USDC into the bank</p>
+      </div>
+    </div>
+
+    <div class="not-connected-msg" id="depositMsg">
+      <span>🔌</span>Connect your wallet to deposit
+    </div>
+
+    <div id="depositForm" style="display:none">
+      <div class="tabs">
+        <button class="tab active" onclick="setDepTab('eth',this)">ETH</button>
+        <button class="tab" onclick="setDepTab('usdc',this)">USDC</button>
+      </div>
+
+      <div id="depETH">
+        <div class="form-group">
+          <label>Amount (ETH)</label>
+          <input type="number" id="depEthAmt" placeholder="0.01" step="0.001" min="0" />
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
+          ≈ will be converted to USDC equivalent via Chainlink ETH/USD oracle
+        </p>
+        <button class="btn btn-blue" onclick="depositETH()">⬇️ Deposit ETH</button>
+      </div>
+
+      <div id="depUSDC" style="display:none">
+        <div class="form-group">
+          <label>Amount (USDC)</label>
+          <input type="number" id="depUsdcAmt" placeholder="100" step="1" min="0" />
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
+          Direct USDC deposit — no conversion needed. Requires approval first.
+        </p>
+        <button class="btn btn-blue" onclick="depositUSDC()">⬇️ Deposit USDC</button>
+      </div>
+
+      <div class="log" id="depLog" style="margin-top:1rem">
+        <div class="log-entry log-info">Ready — connect wallet and enter amount</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WITHDRAW ── -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon icon-green">⬆️</div>
+      <div>
+        <h2>Withdraw</h2>
+        <p>Withdraw your ETH or USDC balance</p>
+      </div>
+    </div>
+
+    <div class="not-connected-msg" id="withdrawMsg">
+      <span>🔌</span>Connect your wallet to withdraw
+    </div>
+
+    <div id="withdrawForm" style="display:none">
+      <div class="tabs">
+        <button class="tab active" onclick="setWdTab('eth',this)">ETH</button>
+        <button class="tab" onclick="setWdTab('usdc',this)">USDC</button>
+      </div>
+
+      <div id="wdETH">
+        <div class="form-group">
+          <label>Amount (ETH)</label>
+          <input type="number" id="wdEthAmt" placeholder="0.01" step="0.001" min="0" />
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
+          Available: <span id="wdEthAvail">—</span> ETH
+        </p>
+        <button class="btn btn-green" onclick="withdrawETH()">⬆️ Withdraw ETH</button>
+      </div>
+
+      <div id="wdUSDC" style="display:none">
+        <div class="form-group">
+          <label>Amount (USDC)</label>
+          <input type="number" id="wdUsdcAmt" placeholder="100" step="1" min="0" />
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem">
+          Available: <span id="wdUsdcAvail">—</span> USDC
+        </p>
+        <button class="btn btn-green" onclick="withdrawUSDC()">⬆️ Withdraw USDC</button>
+      </div>
+
+      <div class="log" id="wdLog" style="margin-top:1rem">
+        <div class="log-entry log-info">Ready — enter amount to withdraw</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONTRACT INFO ── -->
+  <div class="card full">
+    <div class="card-header">
+      <div class="card-icon icon-cyan">📋</div>
+      <div>
+        <h2>Contract Information</h2>
+        <p>KipuBankV3 on Sepolia Testnet</p>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem">
+
+      <div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Contract Address</div>
+        <div style="font-family:monospace;font-size:0.82rem;background:var(--bg);padding:0.75rem;border-radius:8px;border:1px solid var(--border);word-break:break-all" id="contractAddr">
+          Deploy the contract first — see README for instructions
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Integrations</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:0.82rem">
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--muted)">Chainlink ETH/USD</span>
+            <span class="pill pill-green">● Live</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--muted)">Uniswap V2 Router</span>
+            <span class="pill pill-green">● Live</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--muted)">USDC (Sepolia)</span>
+            <span class="pill pill-green">● Live</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Security</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:0.82rem">
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--green)">✓</span><span>Oracle staleness check (1h)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--green)">✓</span><span>5% slippage protection</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--green)">✓</span><span>100,000 USDC hard cap</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--green)">✓</span><span>SafeERC20 transfers</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <span style="color:var(--green)">✓</span><span>60 tests — 0 failures</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Built by <a href="https://www.linkedin.com/in/eduardo-moreno-15813b19b" target="_blank">Eduardo Moreno</a> ·
+  <a href="https://github.com/edumor/KipuBankV3" target="_blank">GitHub</a> ·
+  Solidity 0.8.26 · Foundry · Chainlink · Uniswap V2
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIGURATION — Update CONTRACT_ADDRESS after deploying
+// ═══════════════════════════════════════════════════════════
+const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // ← UPDATE THIS
+const USDC_ADDRESS     = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // Sepolia USDC
+
+const ABI = [
+  "function depositETH() external payable",
+  "function depositERC20(address token, uint256 amount) external",
+  "function withdrawETH(uint256 amount) external",
+  "function withdrawUSDC(uint256 amount) external",
+  "function userDepositedETH(address) external view returns (uint256)",
+  "function userDepositedUSDC(address) external view returns (uint256)",
+  "function currentCapUSDC() external view returns (uint256)",
+  "function MAX_CAP() external view returns (uint256)",
+  "function paused() external view returns (bool)"
+];
+
+const USDC_ABI = [
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)"
+];
+
+let provider, signer, contract, usdcContract, userAddress;
+
+// ── TAB HELPERS ──────────────────────────────────────────
+function setDepTab(tab, el) {
+  document.querySelectorAll('#depositForm .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('depETH').style.display  = tab === 'eth'  ? 'block' : 'none';
+  document.getElementById('depUSDC').style.display = tab === 'usdc' ? 'block' : 'none';
+}
+function setWdTab(tab, el) {
+  document.querySelectorAll('#withdrawForm .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('wdETH').style.display  = tab === 'eth'  ? 'block' : 'none';
+  document.getElementById('wdUSDC').style.display = tab === 'usdc' ? 'block' : 'none';
+}
+
+// ── LOG HELPERS ───────────────────────────────────────────
+function addLog(id, msg, cls='log-info') {
+  const log = document.getElementById(id);
+  const d = document.createElement('div');
+  d.className = `log-entry ${cls}`;
+  const ts = new Date().toLocaleTimeString();
+  d.textContent = `[${ts}] ${msg}`;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+function clearLog(id) {
+  document.getElementById(id).innerHTML = '';
+}
+
+// ── CONNECT WALLET ────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert('MetaMask not found. Please install MetaMask to use this app.');
+    return;
+  }
+  try {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer   = await provider.getSigner();
+    userAddress = await signer.getAddress();
+
+    const network = await provider.getNetwork();
+    if (network.chainId !== 11155111n) {
+      addLog('depLog', 'Please switch MetaMask to Sepolia testnet (chainId: 11155111)', 'log-err');
+    }
+
+    contract     = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+
+    // Update UI
+    const btn = document.getElementById('connectBtn');
+    btn.textContent = 'Connected ✓';
+    btn.classList.add('connected');
+
+    const info = document.getElementById('walletInfo');
+    info.classList.add('show');
+    document.getElementById('walletAddr').textContent =
+      userAddress.slice(0,6) + '...' + userAddress.slice(-4);
+
+    document.getElementById('depositMsg').style.display  = 'none';
+    document.getElementById('depositForm').style.display = 'block';
+    document.getElementById('withdrawMsg').style.display = 'none';
+    document.getElementById('withdrawForm').style.display = 'block';
+
+    document.getElementById('contractAddr').textContent = CONTRACT_ADDRESS;
+    document.getElementById('statNetwork').textContent  = `Sepolia · ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
+
+    await refreshStats();
+    addLog('depLog', `Connected: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`, 'log-ok');
+
+  } catch (err) {
+    console.error(err);
+    alert('Connection failed: ' + err.message);
+  }
+}
+
+// ── REFRESH STATS ─────────────────────────────────────────
+async function refreshStats() {
+  if (!contract || !userAddress) return;
+  try {
+    const [cap, maxCap, ethBal, usdcBal, isPaused] = await Promise.all([
+      contract.currentCapUSDC(),
+      contract.MAX_CAP(),
+      contract.userDepositedETH(userAddress),
+      contract.userDepositedUSDC(userAddress),
+      contract.paused()
+    ]);
+
+    const capUsdc    = Number(cap)    / 1e6;
+    const maxCapUsdc = Number(maxCap) / 1e6;
+    const pct        = (capUsdc / maxCapUsdc * 100).toFixed(1);
+    const ethFmt     = parseFloat(ethers.formatEther(ethBal)).toFixed(4);
+    const usdcFmt    = (Number(usdcBal) / 1e6).toFixed(2);
+
+    document.getElementById('statCap').textContent    = capUsdc.toLocaleString('en', {maximumFractionDigits:2}) + ' USDC';
+    document.getElementById('capBar').style.width     = Math.min(pct, 100) + '%';
+    document.getElementById('statCapPct').textContent = `${pct}% of ${maxCapUsdc.toLocaleString('en')} USDC max`;
+    document.getElementById('statETH').textContent    = ethFmt + ' ETH';
+    document.getElementById('statUSDC').textContent   = '$' + usdcFmt;
+    document.getElementById('wdEthAvail').textContent  = ethFmt;
+    document.getElementById('wdUsdcAvail').textContent = usdcFmt;
+
+    document.getElementById('statPaused').innerHTML = isPaused
+      ? '<span class="pill pill-red">⏸ Paused</span>'
+      : '<span class="pill pill-green">▶ Active</span>';
+
+  } catch (err) {
+    console.error('refreshStats:', err);
+  }
+}
+
+// ── DEPOSIT ETH ───────────────────────────────────────────
+async function depositETH() {
+  const amt = document.getElementById('depEthAmt').value;
+  if (!amt || parseFloat(amt) <= 0) { addLog('depLog', 'Enter a valid ETH amount', 'log-err'); return; }
+  clearLog('depLog');
+  addLog('depLog', `Depositing ${amt} ETH…`);
+  try {
+    const value = ethers.parseEther(amt);
+    const tx    = await contract.depositETH({ value });
+    addLog('depLog', `Tx sent: ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    addLog('depLog', `✓ Deposit confirmed!`, 'log-ok');
+    document.getElementById('depEthAmt').value = '';
+    await refreshStats();
+  } catch (err) {
+    addLog('depLog', `✗ ${err.reason || err.message}`, 'log-err');
+  }
+}
+
+// ── DEPOSIT USDC ──────────────────────────────────────────
+async function depositUSDC() {
+  const amt = document.getElementById('depUsdcAmt').value;
+  if (!amt || parseFloat(amt) <= 0) { addLog('depLog', 'Enter a valid USDC amount', 'log-err'); return; }
+  clearLog('depLog');
+  const amtBig = BigInt(Math.round(parseFloat(amt) * 1e6));
+  try {
+    addLog('depLog', `Approving ${amt} USDC…`);
+    const appTx = await usdcContract.approve(CONTRACT_ADDRESS, amtBig);
+    await appTx.wait();
+    addLog('depLog', `Approval confirmed. Depositing…`);
+    const tx = await contract.depositERC20(USDC_ADDRESS, amtBig);
+    addLog('depLog', `Tx sent: ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    addLog('depLog', `✓ USDC deposit confirmed!`, 'log-ok');
+    document.getElementById('depUsdcAmt').value = '';
+    await refreshStats();
+  } catch (err) {
+    addLog('depLog', `✗ ${err.reason || err.message}`, 'log-err');
+  }
+}
+
+// ── WITHDRAW ETH ──────────────────────────────────────────
+async function withdrawETH() {
+  const amt = document.getElementById('wdEthAmt').value;
+  if (!amt || parseFloat(amt) <= 0) { addLog('wdLog', 'Enter a valid ETH amount', 'log-err'); return; }
+  clearLog('wdLog');
+  addLog('wdLog', `Withdrawing ${amt} ETH…`);
+  try {
+    const tx = await contract.withdrawETH(ethers.parseEther(amt));
+    addLog('wdLog', `Tx sent: ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    addLog('wdLog', `✓ Withdrawal confirmed!`, 'log-ok');
+    document.getElementById('wdEthAmt').value = '';
+    await refreshStats();
+  } catch (err) {
+    addLog('wdLog', `✗ ${err.reason || err.message}`, 'log-err');
+  }
+}
+
+// ── WITHDRAW USDC ─────────────────────────────────────────
+async function withdrawUSDC() {
+  const amt = document.getElementById('wdUsdcAmt').value;
+  if (!amt || parseFloat(amt) <= 0) { addLog('wdLog', 'Enter a valid USDC amount', 'log-err'); return; }
+  clearLog('wdLog');
+  addLog('wdLog', `Withdrawing ${amt} USDC…`);
+  try {
+    const amtBig = BigInt(Math.round(parseFloat(amt) * 1e6));
+    const tx     = await contract.withdrawUSDC(amtBig);
+    addLog('wdLog', `Tx sent: ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    addLog('wdLog', `✓ USDC withdrawal confirmed!`, 'log-ok');
+    document.getElementById('wdUsdcAmt').value = '';
+    await refreshStats();
+  } catch (err) {
+    addLog('wdLog', `✗ ${err.reason || err.message}`, 'log-err');
+  }
+}
+
+// ── AUTO REFRESH ──────────────────────────────────────────
+setInterval(() => { if (userAddress) refreshStats(); }, 15000);
+</script>
+
+</body>
+</html>
