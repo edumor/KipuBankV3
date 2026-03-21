@@ -269,3 +269,35 @@ MIT — see [LICENSE](./LICENSE)
 ---
 
 *Built as part of the Henry Blockchain Development Program — Module 4 Final Project*
+
+---
+
+## 🌐 Live Demo
+
+**[→ Open KipuBankV3 Interface](https://edumor.github.io/KipuBankV3/)**
+
+A fully functional web interface to interact with the contract directly from your browser.
+
+### How to use
+
+1. **Install MetaMask** — [metamask.io](https://metamask.io) if you don't have it
+2. **Switch to Sepolia** — In MetaMask, select "Sepolia Test Network"
+3. **Get Sepolia ETH** — Use [sepoliafaucet.com](https://sepoliafaucet.com) to get free test ETH
+4. **Connect Wallet** — Click "Connect Wallet" on the interface
+5. **Deposit ETH** — Enter an amount and click "Deposit ETH"
+6. **Deposit USDC** — Switch to USDC tab, enter amount (auto-approves first)
+7. **Withdraw** — Use the Withdraw panel to retrieve your funds
+
+### Interface Features
+
+| Feature | Description |
+|---------|-------------|
+| 📊 Bank Capacity Bar | Live view of protocol capacity (0–100,000 USDC) |
+| 💰 Your ETH Balance | Your deposited ETH tracked in real time |
+| 💵 Your USDC Balance | Your USDC balance in the bank |
+| ⚡ Transaction Log | Real-time status of every transaction |
+| 🔄 Auto Refresh | Balances update every 15 seconds |
+
+> **Note:** The contract must be deployed on Sepolia for full functionality.
+> See [Deploy to Sepolia](#deploy-to-sepolia) section above.
+
